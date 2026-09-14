@@ -8,9 +8,12 @@ version = "0.1.0"
 description = "Local text-first car music assistant"
 requires-python = ">=3.12"
 dependencies = [
+    "faster-whisper>=1.1,<2",
     "mcp>=1.2,<2",
     "mutagen>=1.47,<2",
+    "numpy>=1.26,<3",
     "pywin32>=310; sys_platform == 'win32'",
+    "sounddevice>=0.5,<1",
 ]
 
 [project.optional-dependencies]
@@ -21,4 +24,4 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.setuptools.packages.find]
-include = ["app*", "cli*", "core*", "llm*", "mcp_server*", "music_backend*", "player*"]
+include = ["app*", "cli*", "core*", "llm*", "mcp_server*", "music_backend*", "player*", "stt*"]
