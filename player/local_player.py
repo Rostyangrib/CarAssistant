@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import logging
 import os
+import re
 from queue import Empty, Queue
 from threading import Event, RLock, Thread
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 from music_backend.models import Track
 from .base import AudioPlayer
@@ -16,6 +18,25 @@ logger = logging.getLogger(__name__)
 
 class PlayerError(RuntimeError):
     pass
+
+
+def _load_playlist(player: Any, paths: tuple[object, ...], start_index: int) -> None:
+    playlist = player.newPlaylist("Car Assistant Queue", "")
+    for path in paths:
+        playlist.appendItem(player.newMedia(str(path)))
+    player.currentPlaylist = playlist
+    player.controls.currentItem = playlist.item(start_index)
+    player.controls.play()
+
+
+def _media_path_key(value: str | os.PathLike[str]) -> str:
+    raw = os.fspath(value)
+    if raw.casefold().startswith("file:"):
+        parsed = urlparse(raw)
+        raw = unquote(parsed.path)
+        if os.name == "nt" and re.match(r"^/[A-Za-z]:", raw):
+            raw = raw[1:]
+    return os.path.normcase(os.path.abspath(raw))
 
 
 @dataclass(slots=True)
@@ -72,7 +93,12 @@ class WindowsMediaPlayer(AudioPlayer):
                     continue
                 try:
                     if command.action == "play":
-                        player.URL = str(command.arguments[0])
+                        paths, start_index = command.arguments
+                        _load_playlist(player, paths, int(start_index))
+                    elif command.action == "select":
+                        player.controls.currentItem = player.currentPlaylist.item(
+                            int(command.arguments[0])
+                        )
                         player.controls.play()
                     elif command.action == "pause":
                         player.controls.pause()
@@ -86,6 +112,9 @@ class WindowsMediaPlayer(AudioPlayer):
                         command.result = int(player.playState)
                     elif command.action == "errors":
                         command.result = int(player.error.errorCount)
+                    elif command.action == "current_url":
+                        media = player.currentMedia
+                        command.result = str(media.sourceURL) if media is not None else ""
                     elif command.action == "close":
                         player.controls.stop()
                         running = False
@@ -112,7 +141,7 @@ class WindowsMediaPlayer(AudioPlayer):
 
     def _play_current(self) -> Track:
         track = self._queue[self._index]
-        self._invoke("play", str(track.path))
+        self._invoke("play", tuple(str(item.path) for item in self._queue), self._index)
         logger.debug("Player action: play %s", track.path)
         return track
 
@@ -155,14 +184,18 @@ class WindowsMediaPlayer(AudioPlayer):
     def next(self) -> Track:
         with self._lock:
             self._require_current()
+            self._sync_current_index()
             self._index = (self._index + 1) % len(self._queue)
-            return self._play_current()
+            self._invoke("select", self._index)
+            return self._queue[self._index]
 
     def previous(self) -> Track:
         with self._lock:
             self._require_current()
+            self._sync_current_index()
             self._index = (self._index - 1) % len(self._queue)
-            return self._play_current()
+            self._invoke("select", self._index)
+            return self._queue[self._index]
 
     def set_volume(self, volume: int) -> int:
         if not 0 <= volume <= 100:
@@ -173,7 +206,23 @@ class WindowsMediaPlayer(AudioPlayer):
         return volume
 
     def get_current_track(self) -> Track | None:
-        return self._queue[self._index] if self._index >= 0 else None
+        with self._lock:
+            if self._index < 0:
+                return None
+            self._sync_current_index()
+            return self._queue[self._index]
+
+    def _sync_current_index(self) -> None:
+        if self._index < 0 or not self._queue:
+            return
+        current_url = str(self._invoke("current_url") or "")
+        if not current_url:
+            return
+        normalized = _media_path_key(current_url)
+        for index, track in enumerate(self._queue):
+            if _media_path_key(track.path) == normalized:
+                self._index = index
+                return
 
     def get_playback_state(self) -> int:
         return int(self._invoke("state"))

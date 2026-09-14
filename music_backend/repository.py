@@ -1,12 +1,47 @@
 from __future__ import annotations
 
 from pathlib import Path
+from difflib import SequenceMatcher
+import logging
 import random
 import re
 import sqlite3
 
 from .database import Database
 from .models import Track
+
+
+logger = logging.getLogger(__name__)
+
+_CYRILLIC_TO_LATIN = str.maketrans(
+    {
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
+        "ж": "zh", "з": "z", "и": "i", "й": "i", "к": "k", "л": "l", "м": "m",
+        "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+        "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
+        "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    }
+)
+_ARTIST_NOISE_WORDS = {
+    "artist", "ispolnitel", "ispolnitelya", "vklyuchi", "vkluchi", "pesni", "pesnyu",
+    "muzyku", "hochu", "poslushat", "postav", "postavte",
+}
+
+
+def _artist_match_key(value: str) -> str:
+    normalized = value.casefold()
+    normalized = re.sub(r"\b(?:nine|найн|девять)\b", "9", normalized)
+    transliterated = normalized.translate(_CYRILLIC_TO_LATIN)
+    tokens = re.findall(r"[a-z0-9]+", transliterated)
+    meaningful = [token for token in tokens if token not in _ARTIST_NOISE_WORDS]
+    return "".join(meaningful).replace("9", "nine")
+
+
+def _artist_match_keys(value: str) -> tuple[str, ...]:
+    parts = re.split(r"[,;&]|\b(?:feat(?:uring)?|ft)\.?\b", value, flags=re.IGNORECASE)
+    keys = {_artist_match_key(value)}
+    keys.update(_artist_match_key(part) for part in parts)
+    return tuple(key for key in keys if key)
 
 
 def _escape_like(value: str) -> str:
@@ -94,7 +129,45 @@ class MusicRepository:
                 "ORDER BY CASE WHEN artist_norm = ? THEN 0 ELSE 1 END LIMIT 1",
                 (pattern, normalized),
             ).fetchone()
-        return str(row["artist"]) if row else None
+            if row is not None:
+                return str(row["artist"])
+            rows = connection.execute(
+                "SELECT DISTINCT artist FROM tracks ORDER BY artist LIMIT 500"
+            ).fetchall()
+        query_key = _artist_match_key(artist)
+        if len(query_key) < 3:
+            return None
+        ranked = []
+        matched_keys: dict[str, str] = {}
+        for candidate in rows:
+            candidate_artist = str(candidate["artist"])
+            keys = _artist_match_keys(candidate_artist)
+            matched_key = max(
+                keys, key=lambda key: SequenceMatcher(None, query_key, key).ratio()
+            )
+            score = SequenceMatcher(None, query_key, matched_key).ratio()
+            ranked.append((score, candidate_artist))
+            matched_keys[candidate_artist] = matched_key
+        ranked.sort(reverse=True)
+        if not ranked:
+            return None
+        best_score, best_artist = ranked[0]
+        best_key = matched_keys[best_artist]
+        prefix_match = len(query_key) >= 5 and (
+            best_key.startswith(query_key) or query_key.startswith(best_key)
+        )
+        runner_up = ranked[1][0] if len(ranked) > 1 else 0.0
+        if (best_score >= 0.70 or prefix_match) and best_score - runner_up >= 0.08:
+            logger.debug(
+                "Fuzzy artist match: query=%r artist=%r score=%.3f", artist, best_artist, best_score
+            )
+            return best_artist
+        return None
+
+    def get_all_tracks(self) -> list[Track]:
+        with self.database.connect() as connection:
+            rows = connection.execute("SELECT * FROM tracks ORDER BY artist, album, title").fetchall()
+        return [self._row_to_track(row) for row in rows]
 
     def find_by_artist(self, artist: str) -> list[Track]:
         resolved = self.find_artist(artist)

@@ -35,7 +35,7 @@ class MockLLM(LLM):
         if "случайн" in normalized and any(word in normalized for word in ("включ", "постав", "давай")):
             return ToolCall("play_random")
         artist_request = re.match(
-            r"^(?:давай\s+что-нибудь\s+из|я\s+хочу\s+послушать|найди\s+песни)\s+(.+?)\s*[.!?]*$",
+            r"^(?:сегодня\s+)?(?:давай\s+что-нибудь\s+из|я\s+хочу\s+послушать|найди\s+песни|исполнитель)\s+(.+?)\s*[.!?]*$",
             text,
             re.IGNORECASE,
         )

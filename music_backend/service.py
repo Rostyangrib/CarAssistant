@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 
 from player.base import AudioPlayer
 from .models import Track
@@ -25,7 +26,8 @@ class MusicService:
         if track is None:
             raise MusicNotFoundError("track")
         logger.debug("MusicService action: play_track %s", title)
-        return self.player.play([track])
+        queue = [track] + [item for item in self.repository.get_all_tracks() if item.id != track.id]
+        return self.player.play(queue)
 
     def play_artist(self, artist: str) -> Track:
         tracks = self.repository.find_by_artist(artist)
@@ -35,11 +37,12 @@ class MusicService:
         return self.player.play(tracks)
 
     def play_random(self) -> Track:
-        track = self.repository.get_random_track()
-        if track is None:
+        tracks = self.repository.get_all_tracks()
+        if not tracks:
             raise MusicNotFoundError("track")
+        random.shuffle(tracks)
         logger.debug("MusicService action: play_random")
-        return self.player.play([track])
+        return self.player.play(tracks)
 
     def pause(self) -> None:
         self.player.pause()

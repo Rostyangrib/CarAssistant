@@ -56,7 +56,7 @@ TOOL_SCHEMAS: list[dict[str, object]] = [
     {
         "type": "function",
         "function": {
-            "name": "play_artist", "description": "Воспроизвести музыку исполнителя. Использовать также, когда пользователь написал только имя исполнителя.",
+            "name": "play_artist", "description": "Воспроизвести музыку исполнителя. Использовать также для фразы «исполнитель X» и приблизительно распознанного голосом имени: tool сверяет его с локальным каталогом.",
             "parameters": {"type": "object", "properties": {"artist": {"type": "string"}}, "required": ["artist"]},
         },
     },

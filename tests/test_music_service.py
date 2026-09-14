@@ -18,9 +18,12 @@ def service(repository: MusicRepository, tracks) -> tuple[MusicService, FakePlay
 def test_play_track_artist_and_random(service) -> None:
     music, player = service
     assert music.play_track("Yesterday").title == "Yesterday"
+    assert player.queue[0].title == "Yesterday"
+    assert len(player.queue) == 3
     assert music.play_artist("Кино").artist == "Кино"
     assert len(player.queue) == 2
     assert music.play_random() is not None
+    assert len(player.queue) == 3
 
 
 def test_transport_controls(service) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from music_backend.database import Database
+from music_backend.models import Track
 from music_backend.repository import MusicRepository
 
 
@@ -32,3 +33,19 @@ def test_find_artist_and_random(repository: MusicRepository, tracks) -> None:
     assert repository.find_artist("кино") == "Кино"
     assert len(repository.find_by_artist("Кино")) == 2
     assert repository.get_random_track() in [repository.find_track(track.title) for track in tracks]
+
+
+def test_fuzzy_artist_search_handles_common_stt_distortions(repository, tracks, tmp_path) -> None:
+    for track in tracks:
+        repository.upsert(track)
+    repository.upsert(Track("Трек", "9mice, Kai Angel", tmp_path / "9mice.mp3"))
+    assert repository.find_artist("Nine Wives") == "9mice, Kai Angel"
+    assert repository.find_artist("9-майс") == "9mice, Kai Angel"
+    assert repository.find_artist("исполнитель 9 М") == "9mice, Kai Angel"
+    assert repository.find_artist("совершенно другое имя") is None
+
+
+def test_get_all_tracks(repository: MusicRepository, tracks) -> None:
+    for track in tracks:
+        repository.upsert(track)
+    assert len(repository.get_all_tracks()) == len(tracks)
