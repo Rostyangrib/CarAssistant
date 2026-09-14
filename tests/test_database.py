@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from music_backend.database import Database
+from music_backend.repository import MusicRepository
+
+
+def test_database_creates_schema(tmp_path: Path) -> None:
+    database = Database(tmp_path / "nested" / "music.db")
+    database.initialize()
+    with database.connect() as connection:
+        table = connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tracks'").fetchone()
+        indices = {row[1] for row in connection.execute("PRAGMA index_list(tracks)")}
+    assert table is not None
+    assert {"idx_tracks_title", "idx_tracks_artist", "idx_tracks_album"} <= indices
+
+
+def test_add_get_and_update(repository: MusicRepository, tracks) -> None:
+    assert repository.upsert(tracks[0]) == "added"
+    assert repository.upsert(tracks[0]) == "unchanged"
+    found = repository.find_track("группа")
+    assert found and found.artist == "Кино"
+    changed = type(tracks[0])("Группа крови", "Кино", tracks[0].path, "Новое", 275.0)
+    assert repository.upsert(changed) == "updated"
+    assert repository.get_track(found.id).album == "Новое"
+
+
+def test_find_artist_and_random(repository: MusicRepository, tracks) -> None:
+    for track in tracks:
+        repository.upsert(track)
+    assert repository.find_artist("кино") == "Кино"
+    assert len(repository.find_by_artist("Кино")) == 2
+    assert repository.get_random_track() in [repository.find_track(track.title) for track in tracks]
