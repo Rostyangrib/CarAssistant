@@ -25,7 +25,7 @@ def _load_playlist(player: Any, paths: tuple[object, ...], start_index: int) -> 
     for path in paths:
         playlist.appendItem(player.newMedia(str(path)))
     player.currentPlaylist = playlist
-    player.controls.currentItem = playlist.item(start_index)
+    player.controls.currentItem = playlist.Item(start_index)
     player.controls.play()
 
 
@@ -96,7 +96,7 @@ class WindowsMediaPlayer(AudioPlayer):
                         paths, start_index = command.arguments
                         _load_playlist(player, paths, int(start_index))
                     elif command.action == "select":
-                        player.controls.currentItem = player.currentPlaylist.item(
+                        player.controls.currentItem = player.currentPlaylist.Item(
                             int(command.arguments[0])
                         )
                         player.controls.play()

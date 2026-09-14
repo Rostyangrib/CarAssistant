@@ -12,6 +12,7 @@ from core.command_router import CommandRouter, RouteType
         ("Стоп", "pause_music"),
         ("Продолжи", "resume_music"),
         ("Следующий трек", "next_track"),
+        ("Следующая песня", "next_track"),
         ("Предыдущий трек", "previous_track"),
         ("Громче", "change_volume"),
         ("Тише", "change_volume"),

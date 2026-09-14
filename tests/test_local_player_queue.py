@@ -10,7 +10,7 @@ class FakePlaylist:
     def appendItem(self, media) -> None:
         self.media.append(media)
 
-    def item(self, index):
+    def Item(self, index):
         return self.media[index]
 
 
