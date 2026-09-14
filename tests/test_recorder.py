@@ -90,6 +90,15 @@ def test_maximum_duration_stops_continuous_speech() -> None:
     assert audio.stop_reason == "timeout"
 
 
+def test_enter_signal_stops_recording_manually() -> None:
+    fake = FakeSoundDevice([_frame(1)] * 10)
+    checks = iter([False, False, True])
+    audio = _recorder(fake).record_utterance(lambda: next(checks))
+    assert audio.duration == pytest.approx(0.2)
+    assert audio.stop_reason == "manual"
+    assert fake.stream.closed
+
+
 def test_device_errors_are_domain_errors_and_release_stream() -> None:
     with pytest.raises(MicrophoneNotFoundError):
         _recorder(FakeSoundDevice(query_error=True)).record_utterance()

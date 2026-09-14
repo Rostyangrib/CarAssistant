@@ -53,7 +53,7 @@ class SoundDeviceRecorder(AudioRecorder):
             raise MicrophoneUnavailableError("sounddevice is not installed") from error
         return sounddevice
 
-    def record_utterance(self) -> AudioData:
+    def record_utterance(self, stop_requested: Callable[[], bool] | None = None) -> AudioData:
         sounddevice = self._sounddevice_loader()
         try:
             info = sounddevice.query_devices(self.input_device, "input")
@@ -87,6 +87,9 @@ class SoundDeviceRecorder(AudioRecorder):
                     self.channels,
                 )
                 while captured_seconds < self.max_record_seconds:
+                    if stop_requested is not None and stop_requested():
+                        stop_reason = "manual"
+                        break
                     frame, _overflowed = stream.read(block_size)
                     mono = np.asarray(frame, dtype=np.float32).reshape(-1)
                     frame_duration = len(mono) / self.sample_rate

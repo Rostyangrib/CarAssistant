@@ -11,6 +11,22 @@ from stt.base import AudioRecorder, SpeechToText, VoiceInputError
 logger = logging.getLogger(__name__)
 
 
+def windows_enter_pressed() -> bool:
+    """Return immediately and consume input when Enter is pressed on Windows."""
+    try:
+        import msvcrt
+    except ImportError:
+        return False
+    pressed = False
+    while msvcrt.kbhit():
+        character = msvcrt.getwch()
+        if character in {"\x00", "\xe0"} and msvcrt.kbhit():
+            msvcrt.getwch()
+        elif character == "\r":
+            pressed = True
+    return pressed
+
+
 class VoiceInterface:
     def __init__(
         self,
@@ -19,6 +35,7 @@ class VoiceInterface:
         stt: SpeechToText,
         *,
         debug: bool = False,
+        stop_requested: Callable[[], bool] | None = None,
         input_fn: Callable[[str], str] = input,
         output_fn: Callable[[str], None] = print,
     ) -> None:
@@ -26,12 +43,16 @@ class VoiceInterface:
         self.recorder = recorder
         self.stt = stt
         self.debug = debug
+        self.stop_requested = stop_requested
         self.input = input_fn
         self.output = output_fn
 
     def run(self) -> None:
         self.output("Car AI Assistant started in voice mode.\n")
-        self.output("Нажмите Enter и произнесите команду. Для выхода нажмите Ctrl+C.\n")
+        self.output(
+            "Нажмите Enter и произнесите команду. Повторный Enter завершит запись. "
+            "Для выхода нажмите Ctrl+C.\n"
+        )
         while True:
             try:
                 self.input("Нажмите Enter для начала записи...")
@@ -42,9 +63,12 @@ class VoiceInterface:
 
     def process_once(self) -> None:
         total_started = perf_counter()
-        self.output("Listening...")
+        self.output("Listening... Нажмите Enter для завершения записи.")
         try:
-            audio = self.recorder.record_utterance()
+            if self.stop_requested is None:
+                audio = self.recorder.record_utterance()
+            else:
+                audio = self.recorder.record_utterance(self.stop_requested)
             stt_started = perf_counter()
             transcription = self.stt.transcribe(audio)
             stt_latency = perf_counter() - stt_started

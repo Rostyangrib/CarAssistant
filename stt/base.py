@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -60,7 +61,7 @@ class STTBackendError(VoiceInputError):
 
 class AudioRecorder(ABC):
     @abstractmethod
-    def record_utterance(self) -> AudioData:
+    def record_utterance(self, stop_requested: Callable[[], bool] | None = None) -> AudioData:
         raise NotImplementedError
 
 

@@ -96,6 +96,21 @@ def test_debug_output_has_voice_timings() -> None:
     assert "[DEBUG] total_voice_request_latency=" in debug
 
 
+def test_manual_stop_signal_is_passed_to_recorder() -> None:
+    received = []
+
+    class RecorderWithStop:
+        def record_utterance(self, stop_requested=None):
+            received.append(stop_requested)
+            return _audio()
+
+    signal = lambda: True
+    VoiceInterface(
+        FakeAssistant(), RecorderWithStop(), FakeSTT(), stop_requested=signal, output_fn=lambda _text: None
+    ).process_once()
+    assert received == [signal]
+
+
 class ForbiddenLLM(LLM):
     def chat(self, message):
         raise AssertionError("direct voice command must bypass LLM")

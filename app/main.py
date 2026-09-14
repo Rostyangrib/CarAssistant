@@ -111,7 +111,7 @@ def main() -> int:
     )
     assistant = Assistant(llm, gateway)
     if args.voice:
-        from cli.voice import VoiceInterface
+        from cli.voice import VoiceInterface, windows_enter_pressed
         from stt.faster_whisper import FasterWhisperSTT
         from stt.recorder import SoundDeviceRecorder
 
@@ -135,7 +135,13 @@ def main() -> int:
             speech_timeout=settings.audio_speech_timeout,
             max_record_seconds=settings.audio_max_record_seconds,
         )
-        VoiceInterface(assistant, recorder, stt, debug=args.debug).run()
+        VoiceInterface(
+            assistant,
+            recorder,
+            stt,
+            debug=args.debug,
+            stop_requested=windows_enter_pressed,
+        ).run()
     else:
         CLI(assistant, debug=args.debug).run()
     return 0
