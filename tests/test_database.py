@@ -49,3 +49,15 @@ def test_get_all_tracks(repository: MusicRepository, tracks) -> None:
     for track in tracks:
         repository.upsert(track)
     assert len(repository.get_all_tracks()) == len(tracks)
+
+
+def test_fuzzy_track_search_handles_transliteration_and_suffix(repository, tmp_path) -> None:
+    repository.upsert(
+        Track(
+            "Balaclava (Prod. DJ Tape & Serge Laconic)",
+            "Big Baby Tape",
+            tmp_path / "balaclava.mp3",
+        )
+    )
+    found = repository.find_track("Балаклава")
+    assert found and found.title == "Balaclava (Prod. DJ Tape & Serge Laconic)"

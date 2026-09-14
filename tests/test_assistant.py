@@ -44,7 +44,7 @@ def test_mock_pipeline_plays_approximate_spoken_artist(repository, tracks, tmp_p
     repository.upsert(Track("Трек", "9mice, Kai Angel", tmp_path / "9mice.mp3"))
     gateway = ToolGateway(MusicTools(MusicService(repository, FakePlayer())))
     reply = Assistant(MockLLM(gateway), gateway).handle("исполнитель 9 М")
-    assert reply.tool_call == ToolCall("play_artist", {"artist": "9 М"})
+    assert reply.tool_call == ToolCall("play_artist", {"artist": "9 м"})
     assert reply.tool_result and reply.tool_result["success"] is True
     assert "9mice, Kai Angel" in reply.text
 

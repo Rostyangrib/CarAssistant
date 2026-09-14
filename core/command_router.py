@@ -52,4 +52,16 @@ class CommandRouter:
     def route(self, message: str) -> Route:
         normalized = re.sub(r"[.!?]+$", "", " ".join(message.casefold().split())).strip()
         tool_call = self._DIRECT.get(normalized)
+        if tool_call is None:
+            artist_match = re.fullmatch(
+                r"(?:(?:включи|ключи)\s+(?:исполнителя?|исполнитель)|"
+                r"(?:исполнитель|респонитель))\s+(?:на\s+)?(.+)",
+                normalized,
+            )
+            if artist_match:
+                tool_call = ToolCall("play_artist", {"artist": artist_match.group(1).strip()})
+        if tool_call is None:
+            track_match = re.fullmatch(r"песня\s+(.+)", normalized)
+            if track_match:
+                tool_call = ToolCall("play_track", {"title": track_match.group(1).strip()})
         return Route(RouteType.DIRECT, tool_call) if tool_call else Route(RouteType.LLM)

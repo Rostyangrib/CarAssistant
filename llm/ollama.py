@@ -81,15 +81,15 @@ Transport = Callable[[dict[str, object]], dict[str, object]]
 
 def _parse_textual_tool_call(content: str) -> ToolCall | None:
     """Accept a narrow fallback used by small models that print a call instead of structuring it."""
-    normalized_content = content.replace('<|"|>', '"')
-    brace_match = re.fullmatch(
+    normalized_content = content.replace('<|"|>', '"').replace("\\_", "_")
+    bracket_match = re.fullmatch(
         r"\s*(search_track|search_artist|play_track|play_artist|set_volume)"
-        r"\s*\{\s*(query|artist|title|volume)\s*[:=]\s*(.*?)\s*\}\s*",
+        r"\s*[({]\s*(query|artist|title|volume)\s*[:=]\s*(.*?)\s*[)}]\s*",
         normalized_content,
         flags=re.IGNORECASE,
     )
-    if brace_match:
-        name, argument, value = brace_match.groups()
+    if bracket_match:
+        name, argument, value = bracket_match.groups()
         expected = {
             "search_track": "query", "search_artist": "artist", "play_track": "title",
             "play_artist": "artist", "set_volume": "volume",
@@ -102,7 +102,7 @@ def _parse_textual_tool_call(content: str) -> ToolCall | None:
         return ToolCall(name, {expected[name]: parsed_value})
     match = re.fullmatch(
         r"\s*(search_track|search_artist|play_track|play_artist|set_volume)"
-        r"\s+(?:с\s+)?(query|artist|title|volume)\s*=\s*[\"']?(.+?)[\"']?\s*",
+        r"\s+(?:(?:с|with)\s+)?(query|artist|title|volume)\s*=\s*[\"']?(.+?)[\"']?\s*",
         normalized_content,
         flags=re.IGNORECASE,
     )

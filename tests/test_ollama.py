@@ -60,6 +60,22 @@ def test_gemma_special_quote_tool_call_is_safely_parsed() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        'play\\_artist(artist="Big Baby Tap")',
+        'play\\_artist with artist="Big Baby Tape"',
+    ],
+)
+def test_gemma_printed_artist_call_variants_are_safely_parsed(content: str) -> None:
+    llm = OllamaLLM(
+        "http://localhost:11434", "gemma4:e2b",
+        transport=lambda _: {"message": {"content": content}},
+    )
+    expected = "Big Baby Tap" if "Tap\"" in content else "Big Baby Tape"
+    assert llm.chat("Включи исполнителя") == ToolCall("play_artist", {"artist": expected})
+
+
 @pytest.mark.parametrize("content", ["pause_music{}", "pause_music()", "pause_music"])
 def test_textual_no_argument_tool_call_is_safely_parsed(content: str) -> None:
     llm = OllamaLLM(

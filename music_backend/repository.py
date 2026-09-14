@@ -44,6 +44,18 @@ def _artist_match_keys(value: str) -> tuple[str, ...]:
     return tuple(key for key in keys if key)
 
 
+def _track_match_key(value: str) -> str:
+    transliterated = value.casefold().translate(_CYRILLIC_TO_LATIN)
+    tokens = re.findall(r"[a-z0-9]+", transliterated)
+    noise = {"pesnya", "pesnyu", "trek", "vklyuchi", "vkluchi", "postav"}
+    return "".join(token for token in tokens if token not in noise)
+
+
+def _track_match_keys(value: str) -> tuple[str, ...]:
+    base = re.split(r"[([]|\b(?:feat(?:uring)?|ft|prod)\.?\b", value, maxsplit=1, flags=re.IGNORECASE)[0]
+    return tuple({_track_match_key(value), _track_match_key(base)} - {""})
+
+
 def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
@@ -118,6 +130,27 @@ class MusicRepository:
                 candidates = connection.execute("SELECT * FROM tracks ORDER BY title LIMIT 500").fetchall()
                 wanted = _search_tokens(query)
                 rows = [row for row in candidates if _search_tokens(row["title"]) == wanted][:limit]
+                if not rows:
+                    query_key = _track_match_key(query)
+                    ranked = []
+                    for candidate in candidates:
+                        keys = _track_match_keys(str(candidate["title"]))
+                        score = max(
+                            (SequenceMatcher(None, query_key, key).ratio() for key in keys),
+                            default=0.0,
+                        )
+                        ranked.append((score, candidate))
+                    ranked.sort(key=lambda item: item[0], reverse=True)
+                    if ranked and ranked[0][0] >= 0.72:
+                        runner_up = ranked[1][0] if len(ranked) > 1 else 0.0
+                        if ranked[0][0] - runner_up >= 0.08:
+                            rows = [ranked[0][1]]
+                            logger.debug(
+                                "Fuzzy track match: query=%r title=%r score=%.3f",
+                                query,
+                                rows[0]["title"],
+                                ranked[0][0],
+                            )
         return [self._row_to_track(row) for row in rows]
 
     def find_artist(self, artist: str) -> str | None:

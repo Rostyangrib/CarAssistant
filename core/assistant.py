@@ -113,6 +113,16 @@ class Assistant:
 
     def _execute_direct(self, call: ToolCall) -> dict[str, object]:
         try:
+            if call.name == "play_artist":
+                return {
+                    "success": True,
+                    "track": self.service.play_artist(str(call.arguments["artist"])).as_dict(),
+                }
+            if call.name == "play_track":
+                return {
+                    "success": True,
+                    "track": self.service.play_track(str(call.arguments["title"])).as_dict(),
+                }
             if call.name == "pause_music":
                 self.service.pause()
                 return {"success": True}
